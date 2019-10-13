@@ -43,7 +43,6 @@ import (
 {{- if not .IncludeMain }} --exclude-main{{ end }}
 {{- if .ExcludeSpec }} --exclude-spec{{ end }}
 {{- if .DumpData }} --dump-data{{ end }}
-{{- if .WithContext }} --with-context{{ end }}
 {{ end }}
 func configureFlags(api *{{.Package}}.{{ pascalize .Name }}API) {
   // api.CommandLineOptionsGroups = []swag.CommandLineOptionsGroup{ ... }
@@ -96,14 +95,12 @@ func configureAPI(api *{{.Package}}.{{ pascalize .Name }}API) http.Handler {
   {{- end}}
   {{range .Operations -}}
   // Handler for {{ .Method }} {{ .Path }}
-  api.{{if ne .Package $package}}{{pascalize .Package}}{{end}}{{ pascalize .Name }}Handler = {{.Package}}.{{ pascalize .Name }}HandlerFunc(func({{ if .WithContext }}ctx context.Context, {{ end }}
-    params *{{.Package}}.{{ pascalize .Name }}Params{{if .Authorized}}, principal {{if not ( eq .Principal "interface{}" )}}*{{ end }}{{.Principal}}{{end}}
+  api.{{if ne .Package $package}}{{pascalize .Package}}{{end}}{{ pascalize .Name }}Handler = {{.Package}}.{{ pascalize .Name }}HandlerFunc(func(ctx context.Context, params *{{.Package}}.{{ pascalize .Name }}Params{{if .Authorized}}, principal {{if not ( eq .Principal "interface{}" )}}*{{ end }}{{.Principal}}{{end}}
     {{- range $key, $value := .Responses }},
   {{ .Name }} {{.Package}}.New{{ pascalize .Name }}Func{{ end }},
   ) middleware.Responder {
     return middleware.NotImplemented("operation {{if ne .Package $package}}{{ .Package}}{{end}}.{{pascalize .Name}} has not yet been implemented")
   })
-  }
   {{end}}
 
   api.ServerShutdown = func() {  }
