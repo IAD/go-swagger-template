@@ -20,6 +20,8 @@ import (
   security "github.com/go-openapi/runtime/security"
   strfmt "github.com/go-openapi/strfmt"
   validate "github.com/go-openapi/validate"
+  "github.com/satori/go.uuid"
+  "github.com/sirupsen/logrus"
   swag "github.com/go-openapi/swag"
 
   {{ range .DefaultImports }}{{ printf "%q" . }}
@@ -29,21 +31,21 @@ import (
 )
 
 // {{ pascalize .Name }}HandlerFunc turns a function with the right signature into a {{ humanize .Name }} handler
-type {{ pascalize .Name }}HandlerFunc func({{ pascalize .Name }}Params{{ if .Authorized }}, {{ if not ( eq .Principal "interface{}" ) }}*{{ end }}{{ .Principal }}{{ end }}) middleware.Responder
+type {{ pascalize .Name }}HandlerFunc func(*{{ pascalize .Name }}Params{{ if .Authorized }}, {{ if not ( eq .Principal "interface{}" ) }}*{{ end }}{{ .Principal }}{{ end }}{{ range $key, $value := .Responses }}, New{{pascalize .Name }}Func{{ end }}) middleware.Responder
 
 // Handle executing the request and returning a response
-func (fn {{ pascalize .Name }}HandlerFunc) Handle(params {{ pascalize .Name }}Params{{ if .Authorized }}, principal {{ if not ( eq .Principal "interface{}" ) }}*{{ end }}{{ .Principal }}{{ end }}) middleware.Responder {
-  return fn(params{{ if .Authorized }}, principal{{ end }})
+func (fn {{ pascalize .Name }}HandlerFunc) Handle(params *{{ pascalize .Name }}Params{{ if .Authorized }}, principal {{ if not ( eq .Principal "interface{}" ) }}*{{ end }}{{ .Principal }}{{ end }}{{ range $key, $value := .Responses }}, {{ .Name }} New{{pascalize .Name }}Func{{ end }}) middleware.Responder {
+  return fn(params{{ if .Authorized }}, principal{{ range $key, $value := .Responses }}, {{ .Name }}{{ end }})
 }
 
 // {{ pascalize .Name }}Handler interface for that can handle valid {{ humanize .Name }} params
 type {{ pascalize .Name }}Handler interface {
-  Handle({{ pascalize .Name }}Params{{ if .Authorized }}, {{ if not ( eq .Principal "interface{}" ) }}*{{ end }}{{ .Principal }}{{ end }}) middleware.Responder
+  Handle(*{{ pascalize .Name }}Params{{ if .Authorized }}, {{ if not ( eq .Principal "interface{}" ) }}*{{ end }}{{ .Principal }}{{ end }}{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}Func{{ end }}) middleware.Responder
 }
 
 // New{{ pascalize .Name }} creates a new http.Handler for the {{ humanize .Name }} operation
-func New{{ pascalize .Name }}(ctx *middleware.Context, handler {{ pascalize .Name }}Handler) *{{ pascalize .Name }} {
-  return &{{ pascalize .Name }}{Context: ctx, Handler: handler}
+func New{{ pascalize .Name }}(ctx *middleware.Context, handler {{ pascalize .Name }}Handler, metricsStruct metrics.HTTPInterface) *{{ pascalize .Name }} {
+  return &{{ pascalize .Name }}{Context: ctx, Handler: handler, Metrics: metricsStruct}
 }
 
 /*{{ pascalize .Name }} swagger:route {{ .Method }} {{ .Path }}{{ range .Tags }} {{ . }}{{ end }} {{ camelize .Name }}
@@ -63,33 +65,87 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) ServeHTTP(rw http.ResponseWrit
   if rCtx != nil {
     r = rCtx
   }
-  var Params = New{{ pascalize .Name }}Params()
+    var Params = New{{ pascalize .Name }}Params()
 
-  {{ if .Authorized }}uprinc, aCtx, err := {{ .ReceiverName }}.Context.Authorize(r, route)
-  if err != nil {
-    {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, err)
-    return
-  }
-  if aCtx != nil {
-    r = aCtx
-  }
-  var principal {{ if not (eq .Principal "interface{}") }}*{{ end }}{{ .Principal }}
-  if uprinc != nil {
-    principal = {{ if eq .Principal "interface{}" }}uprinc{{ else }}uprinc.(*{{ .Principal }}) // this is really a {{ .Principal }}, I promise{{ end }}
-  }
+    {{ if .Authorized }}uprinc, aCtx, err := {{ .ReceiverName }}.Context.Authorize(r, route)
+    if err != nil {
+      {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, err)
+      return
+    }
+    if aCtx != nil {
+      r = aCtx
+    }
+    var principal {{ if not (eq .Principal "interface{}") }}*{{ end }}{{ .Principal }}
+    if uprinc != nil {
+      principal = {{ if eq .Principal "interface{}" }}uprinc{{ else }}uprinc.(*{{ .Principal }}) // this is really a {{ .Principal }}, I promise{{ end }}
+    }
 
-  {{ end }}
-  if err := {{ .ReceiverName }}.Context.BindValidRequest(r, route, &Params); err != nil { // bind params
-    {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, err)
-    return
-  }
+    {{ end }}
+    if err := {{ .ReceiverName }}.Context.BindValidRequest(r, route, &Params); err != nil { // bind params
+      {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, err)
+      return
+    }
 
-  {{ if .Authorized }}
-  res := {{ .ReceiverName }}.Handler.Handle(Params, principal) // actually handle the request
-  {{else}}
-  res := {{ .ReceiverName }}.Handler.Handle(Params) // actually handle the request
-  {{ end }}
-  {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, res)
+    // pass predefined values from middleware
+    requestCtx := r.Context()
+    logger := requestCtx.Value("logger").(*logrus.Entry)
+    requestID := requestCtx.Value("requestID").(string)
+
+    // restore jaeger context if possible
+    spanContextJson := r.Header.Get("X-Span-Context")
+    var spanContext trace.SpanContext
+    var ctx context.Context
+    var span *trace.Span
+
+    if err := json.Unmarshal([]byte(spanContextJson), &spanContext); err != nil {
+        ctx, span = trace.StartSpan(requestCtx, "handler")
+    } else {
+        ctx, span = trace.StartSpanWithRemoteParent(context.Background(), "handler", spanContext)
+    }
+
+    span.AddAttributes(
+        trace.StringAttribute("requestId", requestID),
+    )
+
+    defer span.End()
+
+    // pass body
+    Params.RequestBody = requestCtx.Value("body").([]byte)
+
+    Params.Scope = &scope.Scope{
+        Logger:    logger,
+        Ctx:       ctx,
+        Span:      span,
+        RequestID: requestID,
+    }
+
+    defer func() {
+      if rec := recover(); rec != nil {
+        Params.Scope.Logger.Errorf("%s: %s", rec, debug.Stack())
+
+        requestID, ok := requestCtx.Value("requestID").(string)
+        if ok {
+          rw.Header().Add("requestID", requestID)
+        }
+
+        rw.WriteHeader(http.StatusInternalServerError)
+
+        data, err := json.Marshal(apperror.NewInternalPanic())
+        if err != nil {
+          data = []byte(`{"code":"` + apperror.InternalPanic + `","attributes":{},"detail":""}`)
+        }
+
+        o.Context.Respond(rw, r, route.Produces, route, json.RawMessage(data))
+      }
+    }()
+
+    {{ if .Authorized }}
+    res := {{ .ReceiverName }}.Handler.Handle({{ if .WithContext }}r.Context(), {{ end }}Params, principal{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}{{ end }}) // actually handle the request
+    {{else}}
+    res := {{ .ReceiverName }}.Handler.Handle({{ if .WithContext }}r.Context(), {{ end }}Params{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}{{ end }}) // actually handle the request
+    {{ end }}
+    {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, res)
+  })
 
 }
 

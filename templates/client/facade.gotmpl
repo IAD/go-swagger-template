@@ -75,6 +75,76 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *{{ pascali
   return cli
 }
 
+func NewDateTime(t time.Time) strfmt.DateTime {
+	return strfmt.DateTime(t)
+}
+
+func NewClientWithBasePath(url string, endpoint string) *{{ pascalize .Name }} {
+	schemes := []string{"http"}
+    if strings.HasSuffix(url, ":443") {
+		schemes = []string{"https"}
+	}
+
+	transport := httptransport.New(url, endpoint, schemes)
+	return New(transport, strfmt.Default)
+}
+
+//nolint:check-panic
+func NewExternalClientWithEnv() *{{ pascalize .Name }} {
+	host := "{{ humanize .Name }}"
+	v := os.Getenv("{{ upper .Name}}_EXTERNAL_HOST")
+	if v != "" {
+		host = v
+	}
+
+	port := 443
+	v = os.Getenv("{{ upper .Name}}_EXTERNAL_PORT")
+	if v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid port provided for {{ upper .Name}}_EXTERNAL_PORT=%s %s", v, err))
+		}
+		port = i
+	}
+
+	schemes := []string{"http"}
+	if port == 443 {
+		schemes = []string{"https"}
+	}
+
+	url := fmt.Sprintf("%s:%d", host, port)
+
+	transport := httptransport.New(url, "", schemes)
+	transport.Consumers["text/html"] = runtime.TextConsumer()
+
+	return New(transport, strfmt.Default)
+}
+
+//nolint:check-panic
+func NewClientWithEnv() *{{ pascalize .Name }} {
+	port := 80
+	v := os.Getenv("{{ upper .Name}}_LOCAL_PORT")
+	if v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid port provided for {{ upper .Name}}_LOCAL_PORT=%s %s", v, err))
+		}
+		port = i
+	}
+
+	schemes := []string{"http"}
+	if port == 443 {
+		schemes = []string{"https"}
+	}
+
+	url := fmt.Sprintf("{{ humanize .Name }}:%d", port)
+
+	transport := httptransport.New(url, "", schemes)
+	transport.Consumers["text/html"] = runtime.TextConsumer()
+
+	return New(transport, strfmt.Default)
+}
+
 // DefaultTransportConfig creates a TransportConfig with the
 // default settings taken from the meta section of the spec file.
 func DefaultTransportConfig() *TransportConfig {
@@ -117,7 +187,7 @@ func (cfg *TransportConfig) WithSchemes(schemes []string) *TransportConfig {
 // {{ pascalize .Name }} is a client for {{ humanize .Name }}
 type {{ pascalize .Name }} struct {
   {{ range .OperationGroups }}
-  {{ pascalize .Name }} *{{ .Name }}.Client
+  {{ pascalize .Name }} *{{ snakize .Name }}.Client
   {{ end }}
   Transport runtime.ClientTransport
 }

@@ -3,14 +3,14 @@
 {{- end }}
 {{ define "simplequeryparambuilder" }}
 {{ if .IsNullable -}}
-var {{ varname .ID }}Q string
+var {{ varname .ID }} string
 if {{ .ReceiverName }}.{{ pascalize .ID }} != nil {
-  {{ varname .ID }}Q = {{ if .Formatter }}{{ .Formatter }}(*{{ .ReceiverName }}.{{ pascalize .ID }}){{ else }}{{ if not .IsCustomFormatter }}*{{ end }}{{ .ReceiverName }}.{{ pascalize .ID }}{{ if .IsCustomFormatter }}.String(){{end}}{{end}}
+  {{ varname .ID }} = {{ if .Formatter }}{{ .Formatter }}(*{{ .ReceiverName }}.{{ pascalize .ID }}){{ else }}{{ if not .IsCustomFormatter }}*{{ end }}{{ .ReceiverName }}.{{ pascalize .ID }}{{ if .IsCustomFormatter }}.String(){{end}}{{end}}
 }
-{{ else }}{{ varname .ID }}Q := {{ if .Formatter }}{{ .Formatter }}({{ .ReceiverName }}.{{ pascalize .ID }}){{ else }}{{ .ReceiverName }}.{{ pascalize .ID }}{{ if .IsCustomFormatter }}.String(){{end}}{{end}}
+{{ else }}{{ varname .ID }} := {{ if .Formatter }}{{ .Formatter }}({{ .ReceiverName }}.{{ pascalize .ID }}){{ else }}{{ .ReceiverName }}.{{ pascalize .ID }}{{ if .IsCustomFormatter }}.String(){{end}}{{end}}
 {{ end -}}
-if {{ varname .ID }}Q != "" {
-  qs.Set({{ printf "%q" .Name }}, {{ varname .ID }}Q)
+if {{ varname .ID }} != "" {
+  qs.Set({{ printf "%q" .Name }}, {{ varname .ID }})
 }
 {{ end }}
 {{ define "sliceitemqueryparambuilder" }}
@@ -69,7 +69,7 @@ if len({{ varname .ID }}) > 0 {
   if psv != "" {
     _path = strings.Replace(_path, "{{ printf "{%s}" .Name }}", psv, -1)
   } else {
-    return nil, errors.New("{{ camelize .ID }} is required on {{ pascalize $.Name }}URL")
+    return nil, errors.New("{{ pascalize .ID }} is required on {{ pascalize $.Name }}URL")
   }
 }
 {{ else -}}
@@ -102,6 +102,7 @@ import (
 
   "github.com/go-openapi/swag"
   "github.com/go-openapi/strfmt"
+  "github.com/sirupsen/logrus"
 )
 
 // {{ pascalize .Name }}URL generates an URL for the {{ humanize .Name }} operation
@@ -139,7 +140,7 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}URL) SetBasePath(bp string) {
 
 // Build a url path and query string
 func ({{ .ReceiverName }} *{{ pascalize .Name }}URL) Build() (*url.URL, error) {
-  var _result url.URL
+  var result url.URL
 
   var _path = {{ printf "%q" .Path }}
   {{ range .PathParams }}{{ if .IsArray }}
@@ -149,7 +150,7 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}URL) Build() (*url.URL, error) {
   if {{ varname .ID }} != "" {
     _path = strings.Replace(_path, "{{ printf "{%s}" .Name }}", {{ varname .ID }}, -1)
   } else {
-    return nil, errors.New("{{ camelize .ID }} is required on {{ pascalize $.Name }}URL")
+    return nil, errors.New("{{ pascalize .ID }} is required on {{ pascalize $.Name }}URL")
   }
   {{ end }}
 
@@ -159,26 +160,26 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}URL) Build() (*url.URL, error) {
     _basePath = {{ printf "%q" .BasePath }}
   }
   {{ end -}}
-  _result.Path = golangswaggerpaths.Join(_basePath, _path)
+  result.Path = golangswaggerpaths.Join(_basePath, _path)
 
   {{ if gt (len .QueryParams) 0 -}}
   qs := make(url.Values)
   {{ range .QueryParams }}
   {{ template "queryparambuilder" . -}}
   {{- end }}
-  _result.RawQuery = qs.Encode()
+  result.RawQuery = qs.Encode()
   {{- end }}
 
-  return &_result, nil
+  return &result, nil
 }
 
 // Must is a helper function to panic when the url builder returns an error
 func ({{ .ReceiverName }} *{{ pascalize .Name }}URL) Must(u *url.URL, err error) *url.URL {
   if err != nil {
-    panic(err)
+    logrus.Panic(err)
   }
   if u == nil {
-    panic("url can't be nil")
+    logrus.Panic("url can't be nil")
   }
   return u
 }

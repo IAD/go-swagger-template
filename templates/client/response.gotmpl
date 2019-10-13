@@ -30,6 +30,13 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) Code() int {
 }
 {{ end }}
 
+{{- if .Schema }}
+  {{- if eq .Schema.GoType (printf "%s%s" .ModelsPackage ".Error") }}
+    func ({{ .ReceiverName }} *{{ pascalize .Name }}) Plain() (code string, detail string, attributes map[string]string) {
+        return o.Payload.Code, o.Payload.Detail, o.Payload.Attributes
+    }
+  {{- end }}
+{{- end }}
 
 func ({{ .ReceiverName }} *{{ pascalize .Name }}) Error() string {
 	return fmt.Sprintf("[{{ upper .Method }} {{ .Path }}][%d] {{ if .Name }}{{ .Name }} {{ else }}unknown error {{ end }}{{ if .Schema }} %+v{{ end }}", {{ if eq .Code -1 }}{{ .ReceiverName }}._statusCode{{ else }}{{ .Code }}{{ end }}{{ if .Schema }}, o.Payload{{ end }})
@@ -90,7 +97,9 @@ package {{ .Package }}
 
 import (
   "io"
+  "fmt"
   "net/http"
+  "io/ioutil"
 
   "github.com/go-openapi/runtime"
   "github.com/go-openapi/swag"
@@ -123,12 +132,12 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}Reader) ReadResponse(response ru
       if err := result.readResponse(response, consumer, {{ $.ReceiverName }}.formats); err != nil {
         return nil, err
       }
-      return {{ if .IsSuccess }}result, nil{{else}}nil, result{{end}}
+      return result, nil
   {{- end }}
   {{- if .DefaultResponse }}
     {{- with .DefaultResponse }}
       {{- if $.Responses}}
-    default:
+     default:
       {{- end }}
       result := New{{ pascalize .Name }}(response.Code(){{ if .Schema }}{{ if .Schema.IsStream }}, {{ $.ReceiverName }}.writer{{ end }}{{ end }})
       if err := result.readResponse(response, consumer, {{ $.ReceiverName }}.formats); err != nil {
@@ -137,14 +146,19 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}Reader) ReadResponse(response ru
       if response.Code() / 100 == 2 {
         return result, nil
       }
-      return nil, result
+      return result, nil
     {{- end }}
   {{- else }}
     {{ if $.Responses}}
     default:
-    {{- end }}
-      return nil, runtime.NewAPIError("unknown error", response, response.Code())
-  {{- end }}
+      {{- end }}
+      data, err := ioutil.ReadAll(response.Body())
+      if err != nil {
+        return nil, err
+      }
+
+      return nil, fmt.Errorf("Requested {{ upper .Method }} {{ .Path }} returns an error %d: %s", response.Code(), string(data))
+      {{- end}}
   {{- if .Responses}}
   }
   {{- end }}
