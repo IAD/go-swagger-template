@@ -8,7 +8,6 @@ package todos
 import (
 	"net/http"
 
-	"github.com/LiflandGaming/platform/pkg/shared/apperror"
 	"github.com/go-openapi/runtime"
 	"github.com/sirupsen/logrus"
 
@@ -123,15 +122,14 @@ func (o *AddOneDefault) WithErr(err error) *AddOneDefault {
 		return o
 	}
 
-	return o.WithAppCode(apperror.NewInternalError(err))
+	return o.WithError("500", err.Error())
 }
 
-// WithAppCode  adds the Error payload to the add one default response
-func (o *AddOneDefault) WithAppCode(aErr *apperror.AppError) *AddOneDefault {
+// WithError  adds the Error payload to the add one default response
+func (o *AddOneDefault) WithError(code string, message string) *AddOneDefault {
 	o.Payload = &models.Error{
-		Code:       string(aErr.Code),
-		Attributes: aErr.Attributes,
-		Detail:     aErr.Detail,
+		Code:    code,
+		Message: message,
 	}
 	return o
 }

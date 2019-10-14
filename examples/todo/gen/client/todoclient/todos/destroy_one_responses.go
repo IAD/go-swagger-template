@@ -38,7 +38,7 @@ func (o *DestroyOneReader) ReadResponse(response runtime.ClientResponse, consume
 		if response.Code()/100 == 2 {
 			return result, nil
 		}
-		return nil, result
+		return result, nil
 	}
 }
 
@@ -83,6 +83,10 @@ type DestroyOneDefault struct {
 // Code gets the status code for the destroy one default response
 func (o *DestroyOneDefault) Code() int {
 	return o._statusCode
+}
+
+func (o *DestroyOneDefault) Plain() (code string, detail string, attributes map[string]string) {
+	return o.Payload.Code, o.Payload.Detail, o.Payload.Attributes
 }
 
 func (o *DestroyOneDefault) Error() string {

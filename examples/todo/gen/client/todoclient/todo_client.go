@@ -6,6 +6,12 @@ package todoclient
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"fmt"
+	"os"
+	"strconv"
+	"strings"
+	"time"
+
 	"github.com/go-openapi/runtime"
 	httptransport "github.com/go-openapi/runtime/client"
 
@@ -60,6 +66,76 @@ func New(transport runtime.ClientTransport, formats strfmt.Registry) *Todo {
 	cli.Todos = todos.New(transport, formats)
 
 	return cli
+}
+
+func NewDateTime(t time.Time) strfmt.DateTime {
+	return strfmt.DateTime(t)
+}
+
+func NewClientWithBasePath(url string, endpoint string) *Todo {
+	schemes := []string{"http"}
+	if strings.HasSuffix(url, ":443") {
+		schemes = []string{"https"}
+	}
+
+	transport := httptransport.New(url, endpoint, schemes)
+	return New(transport, strfmt.Default)
+}
+
+//nolint:check-panic
+func NewExternalClientWithEnv() *Todo {
+	host := "todo"
+	v := os.Getenv("TODO_EXTERNAL_HOST")
+	if v != "" {
+		host = v
+	}
+
+	port := 443
+	v = os.Getenv("TODO_EXTERNAL_PORT")
+	if v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid port provided for TODO_EXTERNAL_PORT=%s %s", v, err))
+		}
+		port = i
+	}
+
+	schemes := []string{"http"}
+	if port == 443 {
+		schemes = []string{"https"}
+	}
+
+	url := fmt.Sprintf("%s:%d", host, port)
+
+	transport := httptransport.New(url, "", schemes)
+	transport.Consumers["text/html"] = runtime.TextConsumer()
+
+	return New(transport, strfmt.Default)
+}
+
+//nolint:check-panic
+func NewClientWithEnv() *Todo {
+	port := 80
+	v := os.Getenv("TODO_LOCAL_PORT")
+	if v != "" {
+		i, err := strconv.Atoi(v)
+		if err != nil {
+			panic(fmt.Sprintf("Invalid port provided for TODO_LOCAL_PORT=%s %s", v, err))
+		}
+		port = i
+	}
+
+	schemes := []string{"http"}
+	if port == 443 {
+		schemes = []string{"https"}
+	}
+
+	url := fmt.Sprintf("todo:%d", port)
+
+	transport := httptransport.New(url, "", schemes)
+	transport.Consumers["text/html"] = runtime.TextConsumer()
+
+	return New(transport, strfmt.Default)
 }
 
 // DefaultTransportConfig creates a TransportConfig with the

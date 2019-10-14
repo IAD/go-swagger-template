@@ -44,8 +44,8 @@ type {{ pascalize .Name }}Handler interface {
 }
 
 // New{{ pascalize .Name }} creates a new http.Handler for the {{ humanize .Name }} operation
-func New{{ pascalize .Name }}(ctx *middleware.Context, handler {{ pascalize .Name }}Handler, metricsStruct metrics.HTTPInterface) *{{ pascalize .Name }} {
-  return &{{ pascalize .Name }}{Context: ctx, Handler: handler, Metrics: metricsStruct}
+func New{{ pascalize .Name }}(ctx *middleware.Context, handler {{ pascalize .Name }}Handler) *{{ pascalize .Name }} {
+  return &{{ pascalize .Name }}{Context: ctx, Handler: handler}
 }
 
 /*{{ pascalize .Name }} swagger:route {{ .Method }} {{ .Path }}{{ range .Tags }} {{ . }}{{ end }} {{ camelize .Name }}
@@ -81,7 +81,7 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) ServeHTTP(rw http.ResponseWrit
     }
 
     {{ end }}
-    if err := {{ .ReceiverName }}.Context.BindValidRequest(r, route, &Params); err != nil { // bind params
+    if err := {{ .ReceiverName }}.Context.BindValidRequest(r, route, Params); err != nil { // bind params
       {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, err)
       return
     }
@@ -91,33 +91,18 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) ServeHTTP(rw http.ResponseWrit
     logger := requestCtx.Value("logger").(*logrus.Entry)
     requestID := requestCtx.Value("requestID").(string)
 
-    // restore jaeger context if possible
-    spanContextJson := r.Header.Get("X-Span-Context")
-    var spanContext trace.SpanContext
-    var ctx context.Context
-    var span *trace.Span
-
-    if err := json.Unmarshal([]byte(spanContextJson), &spanContext); err != nil {
-        ctx, span = trace.StartSpan(requestCtx, "handler")
-    } else {
-        ctx, span = trace.StartSpanWithRemoteParent(context.Background(), "handler", spanContext)
-    }
-
-    span.AddAttributes(
-        trace.StringAttribute("requestId", requestID),
-    )
-
-    defer span.End()
-
     // pass body
     Params.RequestBody = requestCtx.Value("body").([]byte)
 
-    Params.Scope = &scope.Scope{
-        Logger:    logger,
-        Ctx:       ctx,
-        Span:      span,
-        RequestID: requestID,
-    }
+	Params.Scope = struct {
+		Ctx       context.Context
+		RequestID string
+        Logger    *logrus.Entry
+	}{
+		Ctx:       requestCtx,
+		RequestID: requestID,
+		Logger: logger,
+	}
 
     defer func() {
       if rec := recover(); rec != nil {
@@ -130,19 +115,14 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) ServeHTTP(rw http.ResponseWrit
 
         rw.WriteHeader(http.StatusInternalServerError)
 
-        data, err := json.Marshal(apperror.NewInternalPanic())
-        if err != nil {
-          data = []byte(`{"code":"` + apperror.InternalPanic + `","attributes":{},"detail":""}`)
-        }
-
-        o.Context.Respond(rw, r, route.Produces, route, json.RawMessage(data))
+        o.Context.Respond(rw, r, route.Produces, route, json.RawMessage([]byte(`{"code":"panic","message":""}`)))
       }
     }()
 
     {{ if .Authorized }}
-    res := {{ .ReceiverName }}.Handler.Handle(r.Context(), Params, principal{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}{{ end }}) // actually handle the request
+    res := {{ .ReceiverName }}.Handler.Handle(Params, principal{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}{{ end }}) // actually handle the request
     {{else}}
-    res := {{ .ReceiverName }}.Handler.Handle(r.Context(), Params{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}{{ end }}) // actually handle the request
+    res := {{ .ReceiverName }}.Handler.Handle(Params{{ range $key, $value := .Responses }}, New{{ pascalize .Name }}{{ end }}) // actually handle the request
     {{ end }}
     {{ .ReceiverName }}.Context.Respond(rw, r, route.Produces, route, res)
   }

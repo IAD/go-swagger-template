@@ -118,7 +118,7 @@ type {{ pascalize .Name }}API struct {
   // APIAuthorizer provides access control (ACL/RBAC/ABAC) by providing access to the request and authenticated principal
   APIAuthorizer runtime.Authorizer
   {{end}}
-  {{range .Operations}}// {{ if ne .Package $package }}{{ pascalize .Package }}{{end}}{{ pascalize .Name }}Handler sets the operation handler for the {{ humanize .Name }} operation
+  {{range .Operations}}// {{if ne .Package $package}}{{ pascalize .Package }}{{end}}{{ pascalize .Name }}Handler sets the operation handler for the {{ humanize .Name }} operation
     // {{ .Method }} {{ .Path }}
   {{if ne .Package $package}}{{ pascalize .Package }}{{end}}{{ pascalize .Name }}Handler {{if ne .Package $package}}{{.Package}}.{{end}}{{ pascalize .Name }}Handler
   {{end}}

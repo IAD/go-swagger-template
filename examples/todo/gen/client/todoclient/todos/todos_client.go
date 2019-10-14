@@ -6,6 +6,9 @@ package todos
 // Editing this file might prove futile when you re-run the swagger generate command
 
 import (
+	"fmt"
+	"reflect"
+
 	"github.com/go-openapi/runtime"
 
 	strfmt "github.com/go-openapi/strfmt"
@@ -49,13 +52,14 @@ func (a *Client) AddOne(params *AddOneParams, authInfo runtime.ClientAuthInfoWri
 	if err != nil {
 		return nil, err
 	}
-	success, ok := result.(*AddOneCreated)
-	if ok {
-		return success, nil
+
+	switch v := result.(type) {
+
+	case *AddOneCreated:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("Unexpected Type %v", reflect.TypeOf(v))
 	}
-	// unexpected success response
-	unexpectedSuccess := result.(*AddOneDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
 /*
@@ -83,13 +87,14 @@ func (a *Client) DestroyOne(params *DestroyOneParams, authInfo runtime.ClientAut
 	if err != nil {
 		return nil, err
 	}
-	success, ok := result.(*DestroyOneNoContent)
-	if ok {
-		return success, nil
+
+	switch v := result.(type) {
+
+	case *DestroyOneNoContent:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("Unexpected Type %v", reflect.TypeOf(v))
 	}
-	// unexpected success response
-	unexpectedSuccess := result.(*DestroyOneDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
 /*
@@ -117,13 +122,14 @@ func (a *Client) Find(params *FindParams, authInfo runtime.ClientAuthInfoWriter)
 	if err != nil {
 		return nil, err
 	}
-	success, ok := result.(*FindOK)
-	if ok {
-		return success, nil
+
+	switch v := result.(type) {
+
+	case *FindOK:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("Unexpected Type %v", reflect.TypeOf(v))
 	}
-	// unexpected success response
-	unexpectedSuccess := result.(*FindDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
 /*
@@ -151,13 +157,14 @@ func (a *Client) UpdateOne(params *UpdateOneParams, authInfo runtime.ClientAuthI
 	if err != nil {
 		return nil, err
 	}
-	success, ok := result.(*UpdateOneOK)
-	if ok {
-		return success, nil
+
+	switch v := result.(type) {
+
+	case *UpdateOneOK:
+		return v, nil
+	default:
+		return nil, fmt.Errorf("Unexpected Type %v", reflect.TypeOf(v))
 	}
-	// unexpected success response
-	unexpectedSuccess := result.(*UpdateOneDefault)
-	return nil, runtime.NewAPIError("unexpected success response: content available as default response in error", unexpectedSuccess, unexpectedSuccess.Code())
 }
 
 // SetTransport changes the transport on the client

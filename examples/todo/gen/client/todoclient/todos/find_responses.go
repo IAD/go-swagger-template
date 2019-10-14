@@ -38,7 +38,7 @@ func (o *FindReader) ReadResponse(response runtime.ClientResponse, consumer runt
 		if response.Code()/100 == 2 {
 			return result, nil
 		}
-		return nil, result
+		return result, nil
 	}
 }
 
@@ -93,6 +93,10 @@ type FindDefault struct {
 // Code gets the status code for the find default response
 func (o *FindDefault) Code() int {
 	return o._statusCode
+}
+
+func (o *FindDefault) Plain() (code string, detail string, attributes map[string]string) {
+	return o.Payload.Code, o.Payload.Detail, o.Payload.Attributes
 }
 
 func (o *FindDefault) Error() string {

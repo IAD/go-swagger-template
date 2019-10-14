@@ -38,7 +38,7 @@ func (o *AddOneReader) ReadResponse(response runtime.ClientResponse, consumer ru
 		if response.Code()/100 == 2 {
 			return result, nil
 		}
-		return nil, result
+		return result, nil
 	}
 }
 
@@ -95,6 +95,10 @@ type AddOneDefault struct {
 // Code gets the status code for the add one default response
 func (o *AddOneDefault) Code() int {
 	return o._statusCode
+}
+
+func (o *AddOneDefault) Plain() (code string, detail string, attributes map[string]string) {
+	return o.Payload.Code, o.Payload.Detail, o.Payload.Attributes
 }
 
 func (o *AddOneDefault) Error() string {

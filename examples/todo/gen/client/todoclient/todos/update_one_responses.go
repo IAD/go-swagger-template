@@ -38,7 +38,7 @@ func (o *UpdateOneReader) ReadResponse(response runtime.ClientResponse, consumer
 		if response.Code()/100 == 2 {
 			return result, nil
 		}
-		return nil, result
+		return result, nil
 	}
 }
 
@@ -95,6 +95,10 @@ type UpdateOneDefault struct {
 // Code gets the status code for the update one default response
 func (o *UpdateOneDefault) Code() int {
 	return o._statusCode
+}
+
+func (o *UpdateOneDefault) Plain() (code string, detail string, attributes map[string]string) {
+	return o.Payload.Code, o.Payload.Detail, o.Payload.Attributes
 }
 
 func (o *UpdateOneDefault) Error() string {

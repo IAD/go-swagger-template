@@ -192,15 +192,14 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithErr(err error) *{{ pascali
 		return o
 	}
 
-    return {{ .ReceiverName }}.WithAppCode(apperror.NewInternalError(err))
+	return o.WithError("500", err.Error())
 }
 
-// WithAppCode  adds the Error payload to the {{ humanize .Name }} response
-func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithAppCode(aErr *apperror.AppError) *{{ pascalize .Name }} {
+// WithError  adds the Error payload to the {{ humanize .Name }} response
+func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithError(code string, message string) *{{ pascalize .Name }} {
 	{{ .ReceiverName }}.Payload =  &models.Error{
-		Code:       string(aErr.Code),
-		Attributes: aErr.Attributes,
-		Detail:     aErr.Detail,
+		Code:    code,
+		Message: message,
 	}
 	return {{ .ReceiverName }}
 }
