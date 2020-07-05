@@ -131,7 +131,7 @@ func setupMiddlewares(handler http.Handler) http.Handler {
 func setupGlobalMiddleware(handler http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/version" {
-			serveVersion(w, r)
+			serveVersion(w)
 			return
 		}
 
@@ -144,6 +144,6 @@ func setupGlobalMiddleware(handler http.Handler) http.Handler {
 	})
 }
 
-func serveVersion(w http.ResponseWriter, r *http.Request) {
+func serveVersion(w http.ResponseWriter) {
     w.WriteHeader(http.StatusOK)
 }

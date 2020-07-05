@@ -389,7 +389,7 @@ func ({{ .ReceiverName }} *{{ $className }}Params) bind{{ pascalize .ID }}(file 
     {{ if or .IsPrimitive .IsCustomFormatter }}
 func ({{ .ReceiverName }} *{{ $className }}Params) bind{{ pascalize .ID }}(rawData []string, hasKey bool, formats strfmt.Registry) error {
       {{ if and (not .IsPathParam) .Required }}if !hasKey {
-    return errors.Required({{ .Path }}, {{ printf "%q" .Location }})
+    return errors.Required({{ .Path }}, {{ printf "%q" .Location }}, rawData)
   }
       {{ end }}var raw string
   if len(rawData) > 0 {
@@ -430,8 +430,8 @@ func ({{ .ReceiverName }} *{{ $className }}Params) bind{{ pascalize .ID }}(rawDa
     {{else if .IsArray}}
 func ({{ .ReceiverName }} *{{ $className }}Params) bind{{ pascalize .ID }}(rawData []string, hasKey bool, formats strfmt.Registry) error {
       {{if .Required }}if !hasKey {
-    return errors.Required({{ .Path }}, {{ printf "%q" .Location }})
-  }
+        return errors.Required({{ .Path }}, {{ printf "%q" .Location }}, rawData)
+      }
       {{ end }}
       {{ if eq .CollectionFormat "multi" -}}
   // CollectionFormat: {{ .CollectionFormat }}
@@ -446,7 +446,7 @@ func ({{ .ReceiverName }} *{{ $className }}Params) bind{{ pascalize .ID }}(rawDa
   {{ varname .Child.ValueExpression }}C := swag.SplitByFormat(qv{{ pascalize .Name }}, {{ printf "%q" .CollectionFormat }}){{ end }}
       {{if and .Required (not .AllowEmptyValue) }}
   if len({{ varname .Child.ValueExpression }}C) == 0 {
-    return errors.Required({{ .Path }}, {{ printf "%q" .Location }})
+    return errors.Required({{ .Path }}, {{ printf "%q" .Location }}, {{ varname .Child.ValueExpression }}C)
   }
       {{ else }}if len({{ varname .Child.ValueExpression }}C) == 0 { {{ if .HasDefault }}
     // Default values have been previously initialized by New{{ $className }}Params(){{ end }}

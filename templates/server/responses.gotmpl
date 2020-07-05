@@ -178,15 +178,15 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithPayload(payload {{ if and 
 // WithErr adds the Error payload with a default code to the {{ humanize .Name }} response
 func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithErr(err error) *{{ pascalize .Name }} {
 	type swaggerErr interface {
-		Plain() (code string, detail string, attributes map[string]string)
+		Plain() (code string, message string, attributes map[string]string)
 	}
 
 	if swaggerErr, ok := err.(swaggerErr); ok {
-		code, detail, attributes := swaggerErr.Plain()
+		code, message, attributes := swaggerErr.Plain()
 
 		o.Payload = &models.Error{
 			Code:       code,
-			Detail:     detail,
+			Message:    message,
 			Attributes: attributes,
 		}
 		return o
@@ -198,8 +198,9 @@ func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithErr(err error) *{{ pascali
 // WithError  adds the Error payload to the {{ humanize .Name }} response
 func ({{ .ReceiverName }} *{{ pascalize .Name }}) WithError(code string, message string) *{{ pascalize .Name }} {
 	{{ .ReceiverName }}.Payload =  &models.Error{
-		Code:    code,
-		Message: message,
+		Attributes: nil,
+		Code:       code,
+		Message:    message,
 	}
 	return {{ .ReceiverName }}
 }
